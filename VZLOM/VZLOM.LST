@@ -1,0 +1,892 @@
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 1
+vzlom.asm
+
+
+
+      1
+      2	    0000			 .model	tiny
+      3					 .386
+      4	    0000			 .code
+      5					 org 100h
+      6					 locals	@@
+      7
+      8		  =0055			 BUFFER_SIZE equ 85
+      9		  =026C			 PASSWORD    equ 026Ch
+     10
+     11		  =00A0			 SYMBOLS_IN_ONE_LINE_COUNT equ 00A0h
+     12		  =0082			 CMD_STR_BEGINING	   equ 0082h
+     13
+     14		  =001A			 BORDER_WIDTH		 equ 001Ah
+     15		  =000C			 BORDER_HEIGHT		 equ 000Ch
+     16		  =001A			 INTRO_BORDER_COLOR	 equ 1Ah
+     17
+     18		  =002A			 PASSED_BORDER_COLOR	 equ 2Ah
+     19		  =004B			 NOT_PASSED_BORDER_COLOR equ 4Bh
+     20		  =07BD			 PASSWORD_SPACE_OFFSET	 equ 07BDh
+     21		  =0010			 PASSWORD_SPACE_LENGTH	 equ 16d
+     22
+     23		  =0015			 PASSED_STRING_LEN	 equ 21d
+     24		  =0012			 NOT_PASSED_STRING_LEN	 equ 18d
+     25		  =0016			 INTRO_STRING_LEN	 equ 0016h
+     26
+     27		  =0008			 BACKSPACE equ 8d
+     28		  =000D			 ENTER	   equ 13d
+*Warning* vzlom.asm(28)	Reserved word used as symbol: ENTER
+     29
+     30					 .CountLineStart macro
+     31							 nop
+     32
+     33							 push si
+     34
+     35							 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+     36							 mov si, offset	BORDER_HORIZONTAL_OFFSET
+     37							 add di, [si]
+     38
+     39							 pop si
+     40
+     41							 nop
+     42							 endm
+     43
+     44					 .CountShadowLineStart macro
+     45							 nop
+     46
+     47							 push si
+     48
+     49							 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+     50							 mov si, offset	SHADOW_HORIZONTAL_OFFSET
+     51							 add di, [si]
+     52
+     53							 pop si
+     54
+     55							 nop
+     56							 endm
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 2
+vzlom.asm
+
+
+
+     57
+     58					 .ColorBorder	 macro
+     59							 nop
+     60
+     61							 mov byte ptr ah, [bp+6] ; border color
+     62							 mov byte ptr bh, [bp+6] ; border color
+     63							 mov byte ptr ch, [bp+6] ; border color
+     64
+     65							 nop
+     66							 endm
+     67
+     68					 .GetBorder		 macro
+     69							 nop
+     70
+     71							 mov byte ptr al, [si]
+     72							 inc si
+     73							 mov byte ptr bl, [si]
+     74							 inc si
+     75							 mov byte ptr cl, [si]
+     76							 inc si
+     77
+     78							 nop
+     79							 endm
+     80
+     81	    0100			 Start:
+     82	    0100  68 B800			 push 0B800h
+     83	    0103  07				 pop es
+     84
+     85	    0104  E8 00B6			 call PrintIntro
+     86	    0107  E8 005F			 call ReadPassword
+     87	    010A  E8 0091			 call HashInput
+     88	    010D  E8 000F			 call CheckPassword
+     89
+     90	    0110  C3				 ret
+     91
+     92
+     93					 ;-----------------------------------------------
+     94					 ; CheckPassword FUNC
+     95					 ; Entry: dx - PASSWORD
+     96					 ;-----------------------------------------------
+     97	    0111  30 30	30 30 30 30 30+	 PasswordString	  db '00000000000000'
+     98		  30 30	30 30 30 30 30
+     99
+    100	    011F			 CheckPassword proc
+    101
+    102	    011F  81 FA	026C				 cmp dx, PASSWORD
+    103	    0123  75 24	90 90				 jne @@NotPassed
+    104
+    105	    0127  B4 9A					 mov ah, 10011010b			 ; GREEN HEARTS
+    106	    0129  B0 03					 mov al, 3					 ; GREEN HEARTS
+    107	    012B  E8 00BC				 call FillVideoRAM
+    108
+    109	    012E  68 03D2r 6A 1A 6A 0C+			 push offset PassedString BORDER_WIDTH BORDER_HEIGHT PASSED_BORDER_COLOR    +
+    110		  6A 2A	68 02FEr	 offset	BorderStyle
+    111	    013A  C7 06	0391r 0015			 mov TEXT_LEN, PASSED_STRING_LEN
+    112
+    113	    0140  E8 00CA				 call DrawBorder
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 3
+vzlom.asm
+
+
+
+    114	    0143  83 C4	0A				 add sp, 10
+    115
+    116	    0146  EB 20	90				 jmp @@End
+    117
+    118	    0149					 @@NotPassed:
+    119
+    120	    0149  B4 9C					 mov ah, 10011100b			 ; RED HEARTS
+    121	    014B  B0 03					 mov al, 3					 ; RED HEARTS
+    122	    014D  E8 009A				 call FillVideoRAM
+    123
+    124	    0150  68 03E8r 6A 1A 6A 0C+			 push offset NotPassedString BORDER_WIDTH BORDER_HEIGHT			    +
+    125		  6A 4B	68 02FEr	 NOT_PASSED_BORDER_COLOR offset	BorderStyle
+    126	    015C  C7 06	0391r 0012			 mov TEXT_LEN, NOT_PASSED_STRING_LEN
+    127
+    128	    0162  E8 00A8				 call DrawBorder
+    129	    0165  83 C4	0A				 add sp, 10
+    130
+    131	    0168					 @@End:
+    132
+    133	    0168  C3					 ret
+    134	    0169					 endp
+    135
+    136
+    137					 ;-----------------------------------------------
+    138					 ; ReadPassword	FUNC
+    139					 ;-----------------------------------------------
+    140	    0169			 ReadPassword proc
+    141	    0169  33 C9					 xor cx,cx
+    142
+    143	    016B  BF 07BE				 mov di, PASSWORD_SPACE_OFFSET + 1
+    144
+    145	    016E					 @@Cycle:
+    146
+    147	    016E  B4 08					 mov ah, 08h
+    148	    0170  CD 21					 int 21h
+    149
+    150	    0172  BE 0111r				 mov si, offset	PasswordString
+    151	    0175  03 F1					 add si, cx
+    152
+    153	    0177  3C 08					 cmp al, BACKSPACE
+    154	    0179  75 10	90 90				 jne @@EnterPassword
+    155	    017D  83 EF	02				 sub di, 2
+    156	    0180  49					 dec cx
+    157	    0181  4E					 dec si
+    158
+    159	    0182  C6 04	00				 mov byte ptr [si],    00h
+    160	    0185  26: C6 05 00				 mov byte ptr es:[di], 00h
+    161
+    162	    0189  EB E3					 jmp @@Cycle
+    163	    018B					 @@EnterPassword:
+    164
+    165	    018B  88 04					 mov byte ptr [si],    al
+    166	    018D  26: C6 05 2A				 mov byte ptr es:[di], 002Ah
+    167
+    168	    0191  3C 0D					 cmp al, ENTER
+    169	    0193  74 08	90 90				 je @@CycleEnd
+    170
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 4
+vzlom.asm
+
+
+
+    171	    0197  83 C7	02				 add di, 2
+    172	    019A  41					 inc cx
+    173	    019B  EB D1					 jmp @@Cycle
+    174	    019D					 @@CycleEnd:
+    175
+    176	    019D  C3					 ret
+    177	    019E					 endp
+    178
+    179					 ;-----------------------------------------------
+    180					 ; Hash	FUNC
+    181					 ;-----------------------------------------------
+    182	    019E			 HashInput proc
+    183
+    184	    019E  33 D2					 xor dx, dx
+    185	    01A0  33 C9					 xor cx, cx
+    186	    01A2  33 C0					 xor ax, ax
+    187
+    188	    01A4					 @@Cycle:
+    189
+    190	    01A4  BE 0111r				 mov si, offset	PasswordString
+    191	    01A7  03 F1					 add si, cx
+    192
+    193	    01A9  80 3C	0D				 cmp byte ptr [si], 13
+    194	    01AC  74 09	90 90				 je @@CycleEnd
+    195
+    196	    01B0  8A 04					 mov byte ptr al, [si]
+    197	    01B2  03 D0					 add dx, ax
+    198
+    199	    01B4  41					 inc cx
+    200	    01B5  EB ED					 jmp @@Cycle
+    201	    01B7					 @@CycleEnd:
+    202
+    203	    01B7  C1 EA	02				 shr dx, 2
+    204	    01BA  D1 E2					 shl dx, 1
+    205
+    206	    01BC  C3					 ret
+    207	    01BD					 endp
+    208
+    209					 ;-----------------------------------------------
+    210					 ; PrintIntro FUNC
+    211					 ;-----------------------------------------------
+    212	    01BD			 PrintIntro proc
+    213
+    214	    01BD  B4 98					 mov ah, 10011000b			 ; GRAY	HEARTS
+    215	    01BF  B0 03					 mov al, 3					 ; GRAY	HEARTS
+    216	    01C1  E8 0026				 call FillVideoRAM
+    217
+    218	    01C4  6A 1A	6A 0C				 push BORDER_WIDTH BORDER_HEIGHT
+    219	    01C8  E8 0155				 call DrawShadow
+    220	    01CB  83 C4	04				 add sp, 4
+    221
+    222	    01CE  68 03BCr 6A 1A 6A 0C+			 push offset IntroString BORDER_WIDTH BORDER_HEIGHT INTRO_BORDER_COLOR	    +
+    223		  6A 1A	68 02FEr	 offset	BorderStyle
+    224	    01DA  C7 06	0391r 0016			 mov TEXT_LEN, INTRO_STRING_LEN
+    225
+    226	    01E0  E8 002A				 call DrawBorder
+    227	    01E3  83 C4	0A				 add sp, 10
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 5
+vzlom.asm
+
+
+
+    228
+    229	    01E6  E8 000B				 call DrawPasswordSpace
+    230
+    231	    01E9  C3					 ret
+    232	    01EA					 endp
+    233
+    234					 ;----------------------------------------------
+    235					 ;FillVideoRAM:	fills video ram	with shit
+    236					 ;Destr: ax, cx, di
+    237					 ;Assumes: es =	0B800h
+    238					 ;Entry:   ax -	BACKGROUND SYMB+COLOR
+    239					 ;----------------------------------------------
+    240	    01EA			 FillVideoRAM	 proc
+    241
+    242	    01EA  FC					 cld
+    243
+    244	    01EB  BF 0000				 mov di, 0
+    245	    01EE  B9 12C0				 mov cx, 80 * 60
+    246
+    247	    01F1  F3> AB				 rep stosw
+    248
+    249	    01F3  C3					 ret
+    250	    01F4					 endp
+    251
+    252					 ;------------------------------------
+    253					 ; Draws Password Space
+    254					 ;------------------------------------
+    255	    01F4			 DrawPasswordSpace	 proc
+    256
+    257	    01F4  BF 07BD				 mov di, PASSWORD_SPACE_OFFSET
+    258	    01F7  B9 0010				 mov cx, PASSWORD_SPACE_LENGTH
+    259
+    260	    01FA					 @@Cycle:
+    261
+    262	    01FA  83 F9	00				 cmp cx, 0
+    263
+    264	    01FD  74 0D	90 90				 je @@CycleEnd
+    265
+    266	    0201  26: C7 05 0070			 mov es:[di], 70h
+*Warning* vzlom.asm(262) Argument needs	type override
+    267
+    268	    0206  83 C7	02				 add di, 2
+    269	    0209  49					 dec cx
+    270	    020A  EB EE					 jmp @@Cycle
+    271
+    272	    020C					 @@CycleEnd:
+    273
+    274	    020C					 endp
+    275	    020C  C3					 ret
+    276
+    277					 ;------------------------------------
+    278					 ; DrawsBorder in the centre of	screen
+    279					 ; Entry: none;	Assumes: ES = 0b800h
+    280					 ; Destr:   ax,	bx, cx,	dx, di,	si
+    281					 ;------------------------------------
+    282	    020D			 DrawBorder	 proc
+    283	    020D  55					 push bp
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 6
+vzlom.asm
+
+
+
+    284	    020E  8B EC					 mov bp, sp
+    285
+    286	    0210  FF 4E	08				 dec [bp+8]
+*Warning* vzlom.asm(282) Argument needs	type override
+    287
+    288							 .ColorBorder
+1   289	    0213  90					 nop
+1   290
+1   291	    0214  8A 66	06				 mov byte ptr ah, [bp+6] ; border color
+1   292	    0217  8A 7E	06				 mov byte ptr bh, [bp+6] ; border color
+1   293	    021A  8A 6E	06				 mov byte ptr ch, [bp+6] ; border color
+1   294
+1   295	    021D  90					 nop
+    296	    021E  8B 76	04				 mov si, [bp+4]
+    297							 .GetBorder
+1   298	    0221  90					 nop
+1   299
+1   300	    0222  8A 04					 mov byte ptr al, [si]
+1   301	    0224  46					 inc si
+1   302	    0225  8A 1C					 mov byte ptr bl, [si]
+1   303	    0227  46					 inc si
+1   304	    0228  8A 0C					 mov byte ptr cl, [si]
+1   305	    022A  46					 inc si
+1   306
+1   307	    022B  90					 nop
+    308
+    309	    022C  56					 push si								 ;  +
+    310					 PUSH SI
+    311	    022D  BE 0387r				 mov si, offset	BORDER_VERTICAL_OFFSET
+    312	    0230  8B 3C					 mov di, [si]							 ; line	num
+    313	    0232  5E					 pop si									 ;  +
+    314					 POP SI
+    315
+    316	    0233  57					 push di								 ;  +
+    317					 PUSH DI
+    318							 .CountLineStart
+1   319	    0234  90					 nop
+1   320
+1   321	    0235  56					 push si
+1   322
+1   323	    0236  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   324	    023A  BE 0385r				 mov si, offset	BORDER_HORIZONTAL_OFFSET
+1   325	    023D  03 3C					 add di, [si]
+1   326
+1   327	    023F  5E					 pop si
+1   328
+1   329	    0240  90					 nop
+    330
+    331	    0241  FF 76	0A				 push [bp+10]							 ; border   +
+    332					 height
+*Warning* vzlom.asm(296) Argument needs	type override
+    333	    0244  E8 0093				 call DrawLine
+    334	    0247  83 C4	02				 add sp, 2
+    335
+    336	    024A  5F					 pop di									 ;  +
+    337					 POP DI
+    338
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 7
+vzlom.asm
+
+
+
+    339							 .GetBorder
+1   340	    024B  90					 nop
+1   341
+1   342	    024C  8A 04					 mov byte ptr al, [si]
+1   343	    024E  46					 inc si
+1   344	    024F  8A 1C					 mov byte ptr bl, [si]
+1   345	    0251  46					 inc si
+1   346	    0252  8A 0C					 mov byte ptr cl, [si]
+1   347	    0254  46					 inc si
+1   348
+1   349	    0255  90					 nop
+    350
+    351	    0256					 @@Cycle:
+    352	    0256  47					 inc di
+    353	    0257  FF 4E	08				 dec [bp+8]
+*Warning* vzlom.asm(306) Argument needs	type override
+    354
+    355	    025A  83 7E	08 00				 cmp [bp+8], 0h
+*Warning* vzlom.asm(308) Argument needs	type override
+    356	    025E  74 1C	90 90				 je @@CycleEnd
+    357
+    358	    0262  57					 push di
+    359							 .CountLineStart
+1   360	    0263  90					 nop
+1   361
+1   362	    0264  56					 push si
+1   363
+1   364	    0265  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   365	    0269  BE 0385r				 mov si, offset	BORDER_HORIZONTAL_OFFSET
+1   366	    026C  03 3C					 add di, [si]
+1   367
+1   368	    026E  5E					 pop si
+1   369
+1   370	    026F  90					 nop
+    371
+    372	    0270  FF 76	0A				 push [bp+10]							 ; border   +
+    373					 height
+*Warning* vzlom.asm(314) Argument needs	type override
+    374	    0273  E8 0064				 call DrawLine
+    375	    0276  83 C4	02				 add sp, 2
+    376	    0279  5F					 pop di
+    377
+    378	    027A  EB DA					 jmp @@Cycle
+    379
+    380	    027C					 @@CycleEnd:
+    381
+    382							 .GetBorder
+1   383	    027C  90					 nop
+1   384
+1   385	    027D  8A 04					 mov byte ptr al, [si]
+1   386	    027F  46					 inc si
+1   387	    0280  8A 1C					 mov byte ptr bl, [si]
+1   388	    0282  46					 inc si
+1   389	    0283  8A 0C					 mov byte ptr cl, [si]
+1   390	    0285  46					 inc si
+1   391
+1   392	    0286  90					 nop
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 8
+vzlom.asm
+
+
+
+    393	    0287  57					 push di
+    394							 .CountLineStart
+1   395	    0288  90					 nop
+1   396
+1   397	    0289  56					 push si
+1   398
+1   399	    028A  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   400	    028E  BE 0385r				 mov si, offset	BORDER_HORIZONTAL_OFFSET
+1   401	    0291  03 3C					 add di, [si]
+1   402
+1   403	    0293  5E					 pop si
+1   404
+1   405	    0294  90					 nop
+    406
+    407	    0295  FF 76	0A				 push [bp+10]							 ; border   +
+    408					 height
+*Warning* vzlom.asm(327) Argument needs	type override
+    409	    0298  E8 003F				 call DrawLine
+    410	    029B  83 C4	02				 add sp, 2
+    411	    029E  5F					 pop di
+    412
+    413	    029F  57					 push di
+    414	    02A0  BE 038Fr				 mov si, offset	TEXT_VERTICAL_OFFSET
+    415	    02A3  8B 3C					 mov di, [si]
+    416
+    417							 .CountLineStart
+1   418	    02A5  90					 nop
+1   419
+1   420	    02A6  56					 push si
+1   421
+1   422	    02A7  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   423	    02AB  BE 0385r				 mov si, offset	BORDER_HORIZONTAL_OFFSET
+1   424	    02AE  03 3C					 add di, [si]
+1   425
+1   426	    02B0  5E					 pop si
+1   427
+1   428	    02B1  90					 nop
+    429
+    430	    02B2  BE 038Dr				 mov si, offset	TEXT_HORIZONTAL_OFFSET
+    431	    02B5  03 3C					 add di, [si]
+    432
+    433	    02B7  8B 76	0C				 mov si, [bp+12]
+    434	    02BA  E8 004A				 call DrawText
+    435
+    436	    02BD  5F					 pop di
+    437	    02BE  BE 038Fr				 mov si, offset	TEXT_VERTICAL_OFFSET
+    438	    02C1  8B 3C					 mov di, [si]
+    439
+    440							 .CountLineStart
+1   441	    02C3  90					 nop
+1   442
+1   443	    02C4  56					 push si
+1   444
+1   445	    02C5  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   446	    02C9  BE 0385r				 mov si, offset	BORDER_HORIZONTAL_OFFSET
+1   447	    02CC  03 3C					 add di, [si]
+1   448
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 9
+vzlom.asm
+
+
+
+1   449	    02CE  5E					 pop si
+1   450
+1   451	    02CF  90					 nop
+    452
+    453	    02D0  BE 038Dr				 mov si, offset	TEXT_HORIZONTAL_OFFSET
+    454	    02D3  03 3C					 add di, [si]
+    455
+    456	    02D5  8B 76	0C				 mov si, [bp+12]
+    457
+    458	    02D8  5D					 pop bp
+    459	    02D9  C3					 ret
+    460	    02DA					 endp
+    461
+    462					 ;---------------------------------
+    463					 ; DrawPasswordSpace FUNC
+    464					 ;---------------------------------
+    465	    02DA			 DrawLine	 proc
+    466	    02DA  55					 push bp
+    467	    02DB  8B EC					 mov bp, sp
+    468
+    469	    02DD  26: 89 05				 mov ES:[di], ax
+    470	    02E0  83 C7	02				 add di, 2
+    471
+    472	    02E3  BA 0000				 mov dx, 0h
+    473	    02E6					 @@Cycle:
+    474	    02E6  3B 56	04					 cmp dx, [bp+4]
+    475	    02E9  74 0B	90 90					 je @@CycleEnd
+    476
+    477	    02ED  26: 89 1D					 mov ES:[di], bx
+    478
+    479	    02F0  83 C7	02					 add di, 2
+    480
+    481	    02F3  42						 inc dx
+    482	    02F4  EB F0						 jmp @@Cycle
+    483	    02F6					 @@CycleEnd:
+    484
+    485	    02F6  26: 89 0D				 mov ES:[di], cx
+    486	    02F9  83 C7	02				 add di, 2
+    487
+    488	    02FC  5D					 pop bp
+    489	    02FD  C3					 ret
+    490	    02FE					 endp
+    491
+    492	    02FE			 STYLE_ARRAY:
+    493	    02FE  C9 CD	BB BA 20 BA C8+	 BorderStyle db	201, 205, 187, 186, ' ', 186, 200, 205,	188
+    494		  CD BC
+    495
+    496					 ;---------------------------------
+    497					 ;DrawText: Draws Text in some place
+    498					 ;Assumes: ES =	06800h
+    499					 ;Entry: di - where to copy, si	- copying source
+    500					 ;Destr: si, di, ax, cx
+    501					 ;---------------------------------
+    502
+    503	    0307			 DrawText	 proc
+    504
+    505	    0307  FC					 cld
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 10
+vzlom.asm
+
+
+
+    506
+    507							 ; Making sure we writing letters
+    508	    0308  8B C7					 mov ax, di
+    509	    030A  25 0001				 and ax, 1
+    510	    030D  03 F8					 add di, ax
+    511
+    512	    030F  8B 0E	0391r				 mov cx, TEXT_LEN
+    513
+    514	    0313					 @@Cycle:
+    515
+    516	    0313  83 F9	00				 cmp cx, 0
+    517	    0316  74 07	90 90				 je @@CycleEnd
+    518
+    519	    031A  A4					 movsb
+    520	    031B  47					 inc di
+    521
+    522	    031C  49					 dec cx
+    523	    031D  EB F4					 jmp @@Cycle
+    524
+    525	    031F					 @@CycleEnd:
+    526
+    527	    031F  C3					 ret
+    528	    0320					 endp
+    529
+    530					 ;---------------------------------
+    531					 ;Draws	Shadow in some place
+    532					 ;Assumes: ES =	06800h
+    533					 ;Entry: none
+    534					 ;Destr: ax, dx, di
+    535					 ;---------------------------------
+    536
+    537	    0320			 DrawShadow	 proc
+    538
+    539	    0320  55					 push bp
+    540	    0321  8B EC					 mov bp, sp
+    541
+    542	    0323  FF 4E	04				 dec [bp+4]
+*Warning* vzlom.asm(438) Argument needs	type override
+    543
+    544	    0326  56					 push si
+    545	    0327  BE 038Br				 mov si, offset	SHADOW_VERTICAL_OFFSET
+    546	    032A  8B 3C					 mov di, [si]
+    547	    032C  5E					 pop si
+    548
+    549	    032D  57					 push di							 ; PUSH	DI
+    550							 .CountShadowLineStart
+1   551	    032E  90					 nop
+1   552
+1   553	    032F  56					 push si
+1   554
+1   555	    0330  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   556	    0334  BE 0389r				 mov si, offset	SHADOW_HORIZONTAL_OFFSET
+1   557	    0337  03 3C					 add di, [si]
+1   558
+1   559	    0339  5E					 pop si
+1   560
+1   561	    033A  90					 nop
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 11
+vzlom.asm
+
+
+
+    562
+    563	    033B  FF 76	06				 push [bp+6]							 ; border   +
+    564					 width
+*Warning* vzlom.asm(448) Argument needs	type override
+    565	    033E  E8 0052				 call DrawShadowLine
+    566	    0341  83 C4	02				 add sp, 2
+    567
+    568	    0344  5F					 pop di								 ; POP DI
+    569
+    570	    0345					 @@Cycle:
+    571	    0345  47					 inc di
+    572	    0346  FF 4E	04				 dec [bp+4]							 ; border   +
+    573					 height
+*Warning* vzlom.asm(456) Argument needs	type override
+    574
+    575	    0349  83 7E	04 00				 cmp [bp+4], 0h
+*Warning* vzlom.asm(458) Argument needs	type override
+    576	    034D  74 1C	90 90				 je @@CycleEnd
+    577
+    578	    0351  57					 push di
+    579							 .CountShadowLineStart
+1   580	    0352  90					 nop
+1   581
+1   582	    0353  56					 push si
+1   583
+1   584	    0354  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   585	    0358  BE 0389r				 mov si, offset	SHADOW_HORIZONTAL_OFFSET
+1   586	    035B  03 3C					 add di, [si]
+1   587
+1   588	    035D  5E					 pop si
+1   589
+1   590	    035E  90					 nop
+    591
+    592	    035F  FF 76	06				 push [bp+6]							 ; border   +
+    593					 width
+*Warning* vzlom.asm(464) Argument needs	type override
+    594	    0362  E8 002E				 call DrawShadowLine
+    595	    0365  83 C4	02				 add sp, 2
+    596
+    597	    0368  5F					 pop di
+    598
+    599	    0369  EB DA					 jmp @@Cycle
+    600
+    601	    036B					 @@CycleEnd:
+    602
+    603	    036B  57					 push di
+    604							 .CountShadowLineStart
+1   605	    036C  90					 nop
+1   606
+1   607	    036D  56					 push si
+1   608
+1   609	    036E  69 FF	00A0				 imul di, SYMBOLS_IN_ONE_LINE_COUNT
+1   610	    0372  BE 0389r				 mov si, offset	SHADOW_HORIZONTAL_OFFSET
+1   611	    0375  03 3C					 add di, [si]
+1   612
+1   613	    0377  5E					 pop si
+1   614
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 12
+vzlom.asm
+
+
+
+1   615	    0378  90					 nop
+    616
+    617	    0379  FF 76	06				 push [bp+6]							 ; border   +
+    618					 height
+*Warning* vzlom.asm(477) Argument needs	type override
+    619	    037C  E8 0014				 call DrawShadowLine
+    620	    037F  83 C4	02				 add sp, 2
+    621
+    622	    0382  5F					 pop di
+    623
+    624	    0383  5D					 pop bp
+    625	    0384  C3					 ret
+    626
+    627	    0385					 endp
+    628
+    629	    0385  0030			 BORDER_HORIZONTAL_OFFSET  dw 0030h
+    630	    0387  0006			 BORDER_VERTICAL_OFFSET	   dw 0006h
+    631	    0389  0034			 SHADOW_HORIZONTAL_OFFSET  dw 0034h
+    632	    038B  0007			 SHADOW_VERTICAL_OFFSET	   dw 0007h
+    633	    038D  0008			 TEXT_HORIZONTAL_OFFSET	   dw 0008h
+    634	    038F  000A			 TEXT_VERTICAL_OFFSET	   dw 000Ah
+    635	    0391  0000			 TEXT_LEN		   dw 0000h
+    636
+    637					 ;---------------------------------
+    638					 ;DrawShadowLine : Draws Line of Shadow	in some	place
+    639					 ;Assumes: ES =	06800h
+    640					 ;Entry: di - where to draw shadow, [bp+4] - border length
+    641					 ;Destr: ax, dx, di
+    642					 ;---------------------------------
+    643	    0393			 DrawShadowLine	 proc
+    644
+    645	    0393  55					 push bp
+    646	    0394  8B EC					 mov bp, sp
+    647
+    648	    0396  83 46	04 02				 add [bp+4], 2
+*Warning* vzlom.asm(507) Argument needs	type override
+    649
+    650	    039A  33 D2					 xor dx, dx
+    651
+    652							 ; Making sure we painting background
+    653	    039C  8B C7					 mov ax, di
+    654	    039E  25 0001				 and ax, 1
+    655	    03A1  3D 0001				 cmp ax, 1
+    656
+    657	    03A4  74 03	90 90				 je @@Cycle
+    658	    03A8  47					 inc di
+    659
+    660	    03A9					 @@Cycle:
+    661	    03A9  3B 56	04					 cmp dx, [bp+4]
+    662	    03AC  74 0C	90 90					 je @@CycleEnd
+    663
+    664	    03B0  26: 80 25 87					 and byte ptr ES:[di], 10000111b
+    665
+    666	    03B4  83 C7	02					 add di, 2
+    667
+    668	    03B7  42						 inc dx
+    669	    03B8  EB EF						 jmp @@Cycle
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 13
+vzlom.asm
+
+
+
+    670	    03BA					 @@CycleEnd:
+    671
+    672	    03BA  5D					 pop bp
+    673	    03BB  C3					 ret
+    674
+    675	    03BC					 endp
+    676
+    677	    03BC  46 6F	72 20 50 69 64+	 IntroString	 db 'For Pidor Hacker Rusal'
+    678		  6F 72	20 48 61 63 6B+
+    679		  65 72	20 52 75 73 61+
+    680		  6C
+    681
+    682	    03D2  41 68	20 74 69 20 70+	 PassedString	 db 'Ah	ti pidor! Vzlomal!$' ;21
+    683		  69 64	6F 72 21 20 56+
+    684		  7A 6C	6F 6D 61 6C 21+
+    685		  24
+    686	    03E8  4C 6F	68 2C 20 44 61+	 NotPassedString db 'Loh, Daun.	Otmena.$'    ; 18
+    687		  75 6E	2E 20 4F 74 6D+
+    688		  65 6E	61 2E 24
+    689					 end Start
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 14
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "03/03/24"
+??FILENAME			  Text	 "vzlom	  "
+??TIME				  Text	 "21:53:59"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@@CYCLE				  Near	 DGROUP:016E
+@@CYCLE				  Near	 DGROUP:01A4
+@@CYCLE				  Near	 DGROUP:01FA
+@@CYCLE				  Near	 DGROUP:0256
+@@CYCLE				  Near	 DGROUP:02E6
+@@CYCLE				  Near	 DGROUP:0313
+@@CYCLE				  Near	 DGROUP:0345
+@@CYCLE				  Near	 DGROUP:03A9
+@@CYCLEEND			  Near	 DGROUP:019D
+@@CYCLEEND			  Near	 DGROUP:01B7
+@@CYCLEEND			  Near	 DGROUP:020C
+@@CYCLEEND			  Near	 DGROUP:027C
+@@CYCLEEND			  Near	 DGROUP:02F6
+@@CYCLEEND			  Near	 DGROUP:031F
+@@CYCLEEND			  Near	 DGROUP:036B
+@@CYCLEEND			  Near	 DGROUP:03BA
+@@END				  Near	 DGROUP:0168
+@@ENTERPASSWORD			  Near	 DGROUP:018B
+@@NOTPASSED			  Near	 DGROUP:0149
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0F0FH
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 VZLOM
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+BACKSPACE			  Number 0008
+BORDERSTYLE			  Byte	 DGROUP:02FE
+BORDER_HEIGHT			  Number 000C
+BORDER_HORIZONTAL_OFFSET	  Word	 DGROUP:0385
+BORDER_VERTICAL_OFFSET		  Word	 DGROUP:0387
+BORDER_WIDTH			  Number 001A
+BUFFER_SIZE			  Number 0055
+CHECKPASSWORD			  Near	 DGROUP:011F
+CMD_STR_BEGINING		  Number 0082
+DRAWBORDER			  Near	 DGROUP:020D
+DRAWLINE			  Near	 DGROUP:02DA
+DRAWPASSWORDSPACE		  Near	 DGROUP:01F4
+DRAWSHADOW			  Near	 DGROUP:0320
+DRAWSHADOWLINE			  Near	 DGROUP:0393
+DRAWTEXT			  Near	 DGROUP:0307
+ENTER				  Number 000D
+FILLVIDEORAM			  Near	 DGROUP:01EA
+HASHINPUT			  Near	 DGROUP:019E
+INTROSTRING			  Byte	 DGROUP:03BC
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 15
+Symbol Table
+
+
+
+INTRO_BORDER_COLOR		  Number 001A
+INTRO_STRING_LEN		  Number 0016
+NOTPASSEDSTRING			  Byte	 DGROUP:03E8
+NOT_PASSED_BORDER_COLOR		  Number 004B
+NOT_PASSED_STRING_LEN		  Number 0012
+PASSEDSTRING			  Byte	 DGROUP:03D2
+PASSED_BORDER_COLOR		  Number 002A
+PASSED_STRING_LEN		  Number 0015
+PASSWORD			  Number 026C
+PASSWORDSTRING			  Byte	 DGROUP:0111
+PASSWORD_SPACE_LENGTH		  Number 0010
+PASSWORD_SPACE_OFFSET		  Number 07BD
+PRINTINTRO			  Near	 DGROUP:01BD
+READPASSWORD			  Near	 DGROUP:0169
+SHADOW_HORIZONTAL_OFFSET	  Word	 DGROUP:0389
+SHADOW_VERTICAL_OFFSET		  Word	 DGROUP:038B
+START				  Near	 DGROUP:0100
+STYLE_ARRAY			  Near	 DGROUP:02FE
+SYMBOLS_IN_ONE_LINE_COUNT	  Number 00A0
+TEXT_HORIZONTAL_OFFSET		  Word	 DGROUP:038D
+TEXT_LEN			  Word	 DGROUP:0391
+TEXT_VERTICAL_OFFSET		  Word	 DGROUP:038F
+
+Macro Name
+
+.COLORBORDER
+.COUNTLINESTART
+.COUNTSHADOWLINESTART
+.GETBORDER
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+  _TEXT				  16  03FB Word	  Public  CODE
+Turbo Assembler	 Version 4.1	    03/03/24 21:53:59	    Page 16
+Error Summary
+
+
+
+*Warning* vzlom.asm(28)	Reserved word used as symbol: ENTER
+*Warning* vzlom.asm(262) Argument needs	type override
+*Warning* vzlom.asm(282) Argument needs	type override
+*Warning* vzlom.asm(296) Argument needs	type override
+*Warning* vzlom.asm(306) Argument needs	type override
+*Warning* vzlom.asm(308) Argument needs	type override
+*Warning* vzlom.asm(314) Argument needs	type override
+*Warning* vzlom.asm(327) Argument needs	type override
+*Warning* vzlom.asm(438) Argument needs	type override
+*Warning* vzlom.asm(448) Argument needs	type override
+*Warning* vzlom.asm(456) Argument needs	type override
+*Warning* vzlom.asm(458) Argument needs	type override
+*Warning* vzlom.asm(464) Argument needs	type override
+*Warning* vzlom.asm(477) Argument needs	type override
+*Warning* vzlom.asm(507) Argument needs	type override
+
